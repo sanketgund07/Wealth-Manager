@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Wealth Manager — Personal Net Worth &amp; Expense Tracker</title>
+  <meta name="description" content="Personal INR wealth, bank budget segregation, goals, expenses, credit cards, and bill calendar manager." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Hind:wght@300;400;500;600;700&text=%E2%82%B9&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Hind"', '"DM Sans"', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'sans-serif']
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body {
+      font-family: 'Hind', 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100dvh;
+      overflow-x: hidden;
+    }
+    .tabular-nums { font-variant-numeric: normal; }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.74);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      box-shadow: 0 8px 30px -12px rgba(15, 23, 42, 0.08);
+    }
+    .dark .glass-card {
+      background: rgba(17, 24, 39, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      box-shadow: 0 12px 36px -14px rgba(0, 0, 0, 0.55);
+    }
+    .glass-sub {
+      background: rgba(248, 250, 252, 0.72);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(15, 23, 42, 0.07);
+    }
+    .dark .glass-sub {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-bar {
+      background: rgba(255, 255, 255, 0.86);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+      border-color: rgba(15, 23, 42, 0.09);
+    }
+    .dark .glass-bar {
+      background: rgba(9, 13, 22, 0.84);
+      border-color: rgba(255, 255, 255, 0.09);
+    }
+    .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 dark:bg-[#070b14] dark:text-white antialiased selection:bg-sky-500/20 selection:text-sky-200 transition-colors duration-200">
+  <!-- Ambient Glass Background -->
+  <div class="fixed inset-0 -z-10 pointer-events-none overflow-hidden">
+    <div class="absolute -top-36 -left-24 w-[420px] h-[420px] rounded-full bg-sky-400/15 dark:bg-sky-500/12 blur-[110px]"></div>
+    <div class="absolute top-1/3 -right-28 w-[400px] h-[400px] rounded-full bg-emerald-400/12 dark:bg-emerald-500/10 blur-[120px]"></div>
+    <div class="absolute -bottom-32 left-1/3 w-[380px] h-[380px] rounded-full bg-sky-300/12 dark:bg-sky-700/12 blur-[120px]"></div>
+  </div>
+
+  <!-- Top App Bar (52px) -->
+  <header class="sticky top-0 z-30 h-[52px] glass-bar border-b px-4 sm:px-6">
+    <div class="max-w-6xl mx-auto h-full flex items-center justify-between gap-4">
+      <button type="button" onclick="setTab('wealth')" class="text-lg font-bold tracking-tight text-slate-900 dark:text-white whitespace-nowrap shrink-0">
+        Wealth Manager
+      </button>
+      <div class="flex items-center gap-1.5 shrink-0">
+        <button type="button" onclick="openBackupModal()" class="min-h-[44px] px-3 rounded-xl glass-sub text-xs font-medium text-slate-700 dark:text-white hover:border-sky-500/40 inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0">
+          Backup / Reset
+        </button>
+        <button id="themeToggleBtn" type="button" onclick="toggleTheme()" class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl glass-sub text-slate-700 dark:text-sky-300 hover:border-sky-500/40 transition-colors" aria-label="Toggle Theme"></button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main id="appRoot" class="max-w-6xl mx-auto px-4 sm:px-6 pt-5 pb-24"></main>
+
+  <!-- Bottom Tab Navigation (64px) -->
+  <nav aria-label="Primary Bottom Navigation" class="fixed bottom-0 left-0 right-0 z-40 glass-bar border-t pb-safe">
+    <div id="bottomNav" class="max-w-xl mx-auto h-16 grid grid-cols-5 items-center px-1"></div>
+  </nav>
+
+  <!-- Reusable Bottom Sheet / Modal -->
+  <div id="modalRoot" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/60 backdrop-blur-sm p-0 sm:p-4" onclick="closeModal()"></div>
+
+  <script>
+    // =========================================================================
+    // INITIAL DATA (Automatically saved to browser localStorage on every edit)
+    // =========================================================================
+    const STORAGE_KEY = 'wealth_manager_single_html_v2';
+    const DEFAULT_STATE = {
+  "theme": "dark",
+  "banks": {
+    "icici": {
+      "id": "icici",
+      "name": "ICICI Bank",
+      "shortName": "ICICI",
+      "balance": 100000,
+      "categories": [
+        {
+          "id": "icici_cat_monthly",
+          "name": "Monthly Expenses",
+          "allocated": 40000,
+          "spent": 0,
+          "kind": "expense"
+        },
+        {
+          "id": "icici_cat_savings",
+          "name": "Core Savings",
+          "allocated": 45000,
+          "spent": 0,
+          "kind": "savings"
+        },
+        {
+          "id": "icici_cat_buffer",
+          "name": "Emergency Buffer",
+          "allocated": 15000,
+          "spent": 0,
+          "kind": "savings"
+        }
+      ]
+    },
+    "hdfc": {
+      "id": "hdfc",
+      "name": "HDFC Bank",
+      "shortName": "HDFC",
+      "balance": 145000,
+      "categories": [
+        {
+          "id": "hdfc_cat_bills",
+          "name": "Bills & Utilities",
+          "allocated": 25000,
+          "spent": 4500,
+          "kind": "expense"
+        },
+        {
+          "id": "hdfc_cat_lifestyle",
+          "name": "Lifestyle & Dining",
+          "allocated": 15000,
+          "spent": 2500,
+          "kind": "expense"
+        },
+        {
+          "id": "hdfc_cat_savings",
+          "name": "SIP & Wealth Reserve",
+          "allocated": 80000,
+          "spent": 0,
+          "kind": "savings"
+        }
+      ]
+    }
+  },
+  "investments": {
+    "mt5": 120000,
+    "fd": 300000,
+    "pf": 410000
+  },
+  "expectedExpenses": [
+    {
+      "id": "exp_rent",
+      "title": "Apartment Rent",
+      "amount": 22000,
+      "bankId": "icici",
+      "categoryId": "icici_cat_monthly",
+      "isPaid": false
+    },
+    {
+      "id": "exp_groceries",
+      "title": "Groceries & Household",
+      "amount": 9500,
+      "bankId": "icici",
+      "categoryId": "icici_cat_monthly",
+      "isPaid": false
+    },
+    {
+      "id": "exp_fuel",
+      "title": "Fuel & Commute",
+      "amount": 4500,
+      "bankId": "icici",
+      "categoryId": "icici_cat_monthly",
+      "isPaid": false
+    },
+    {
+      "id": "exp_utilities",
+      "title": "Electricity & Maid",
+      "amount": 4000,
+      "bankId": "hdfc",
+      "categoryId": "hdfc_cat_bills",
+      "isPaid": false
+    }
+  ],
+  "creditCardExpenses": [
+    {
+      "id": "cc_icici_1",
+      "card": "icici_cc",
+      "title": "Amazon Electronics & Essentials",
+      "amount": 8400,
+      "date": "2026-11-14",
+      "isPaid": false
+    },
+    {
+      "id": "cc_icici_2",
+      "card": "icici_cc",
+      "title": "Dining & Coffee",
+      "amount": 2650,
+      "date": "2026-11-17",
+      "isPaid": false
+    },
+    {
+      "id": "cc_hdfc_1",
+      "card": "hdfc_cc",
+      "title": "Flight Booking (Domestic)",
+      "amount": 11200,
+      "date": "2026-11-12",
+      "isPaid": false
+    },
+    {
+      "id": "cc_hdfc_2",
+      "card": "hdfc_cc",
+      "title": "OTT & Cloud Subscriptions",
+      "amount": 1499,
+      "date": "2026-11-16",
+      "isPaid": false
+    }
+  ],
+  "goals": [
+    {
+      "id": "goal_emergency",
+      "name": "12-Month Financial Runway",
+      "targetAmount": 1500000,
+      "targetDate": "2027-07-16",
+      "mode": "linked",
+      "manualCurrent": 0,
+      "linkedSources": [
+        "icici",
+        "hdfc",
+        "mt5",
+        "pf",
+        "fd"
+      ]
+    },
+    {
+      "id": "goal_liquid",
+      "name": "Liquid Cash & Trading Target",
+      "targetAmount": 500000,
+      "targetDate": "2027-02-21",
+      "mode": "linked",
+      "manualCurrent": 0,
+      "linkedSources": [
+        "icici",
+        "hdfc",
+        "mt5"
+      ]
+    },
+    {
+      "id": "goal_trip",
+      "name": "Japan Autumn Trip",
+      "targetAmount": 250000,
+      "targetDate": "2027-04-27",
+      "mode": "manual",
+      "manualCurrent": 115000,
+      "linkedSources": []
+    }
+  ],
+  "expenseEntries": [
+    {
+      "id": "tx_1",
+      "title": "BESCOM Electricity Bill",
+      "amount": 2800,
+      "categoryName": "Bills & Utilities",
+      "source": "hdfc",
+      "bankCategoryId": "hdfc_cat_bills",
+      "date": "2026-11-15"
+    },
+    {
+      "id": "tx_2",
+      "title": "Broadband Fiber Plan",
+      "amount": 1700,
+      "categoryName": "Bills & Utilities",
+      "source": "hdfc",
+      "bankCategoryId": "hdfc_cat_bills",
+      "date": "2026-11-13"
+    },
+    {
+      "id": "tx_3",
+      "title": "Weekend Dinner",
+      "amount": 2500,
+      "categoryName": "Lifestyle & Dining",
+      "source": "hdfc",
+      "bankCategoryId": "hdfc_cat_lifestyle",
+      "date": "2026-11-16"
+    }
+  ],
+  "bills": [
+    {
+      "id": "bill_wifi",
+      "name": "ACT Fibernet WiFi Renewal",
+      "amount": 1179,
+      "dueDate": "2026-11-20",
+      "recurringMonthly": true,
+      "isDone": false,
+      "bankId": "hdfc"
+    },
+    {
+      "id": "bill_mobile",
+      "name": "Jio Postpaid / Recharge",
+      "amount": 799,
+      "dueDate": "2026-11-23",
+      "recurringMonthly": true,
+      "isDone": false,
+      "bankId": "icici"
+    },
+    {
+      "id": "bill_insurance",
+      "name": "Health & Term Insurance",
+      "amount": 6450,
+      "dueDate": "2026-11-27",
+      "recurringMonthly": false,
+      "isDone": false,
+      "bankId": "hdfc"
+    },
+    {
+      "id": "bill_rent",
+      "name": "Monthly House Rent",
+      "amount": 22000,
+      "dueDate": "2026-11-28",
+      "recurringMonthly": true,
+      "isDone": false,
+      "bankId": "icici"
+    },
+    {
+      "id": "bill_gym",
+      "name": "Fitness Membership",
+      "amount": 2000,
+      "dueDate": "2026-11-16",
+      "recurringMonthly": true,
+      "isDone": true,
+      "bankId": "hdfc"
+    }
+  ]
+};
+
+    let state = loadState();
+    let activeTab = 'wealth';
+    let calYear = new Date().getFullYear();
+    let calMonth = new Date().getMonth();
+    let calSelected = null;
+    let editingExpId = null;
+    let modalLinkedSources = ['icici', 'hdfc'];
+    let modalGoalMode = 'linked';
+    let modalCatKind = 'expense';
+    let modalBillRecurring = true;
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.banks && parsed.investments) return parsed;
+        }
+      } catch {}
+      return JSON.parse(JSON.stringify(DEFAULT_STATE));
+    }
+
+    function saveState() {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
+      applyTheme();
+      render();
+    }
+
+    function applyTheme() {
+      const isDark = state.theme !== 'light';
+      document.documentElement.classList.toggle('dark', isDark);
+      const btn = document.getElementById('themeToggleBtn');
+      if (btn) {
+        btn.innerHTML = isDark
+          ? '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>'
+          : '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
+      }
+    }
+
+    window.toggleTheme = () => {
+      state.theme = state.theme === 'dark' ? 'light' : 'dark';
+      saveState();
+    };
+
+    const inr = (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Math.round(Number.isFinite(n) ? n : 0));
+    const uid = (p) => p + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+    const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const todayIso = () => {
+      const d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    };
+    const fmtDate = (iso) => {
+      if (!iso) return '';
+      const [y, m, d] = iso.split('-').map(Number);
+      if (!y || !m || !d) return iso;
+      return new Date(y, m - 1, d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    };
+    const daysLeft = (iso) => {
+      if (!iso) return 0;
+      const now = new Date();
+      const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      const [y, m, d] = iso.split('-').map(Number);
+      return Math.round((new Date(y, m - 1, d).getTime() - t0) / 86400000);
+    };
+    const daysLabel = (d) => d === 0 ? 'Due today' : d === 1 ? '1 day left' : d > 1 ? d + ' days left' : d === -1 ? '1 day overdue' : Math.abs(d) + ' days overdue';
+
+    function bankMetrics(bank) {
+      let yetToSpend = 0;
+      for (const c of bank.categories) {
+        if (c.kind === 'expense') yetToSpend += Math.max(0, c.allocated - c.spent);
+      }
+      return { balance: bank.balance, yetToSpend, available: bank.balance - yetToSpend };
+    }
+
+    function sourceValue(key) {
+      if (key === 'icici') return state.banks.icici.balance;
+      if (key === 'hdfc') return state.banks.hdfc.balance;
+      return state.investments[key] || 0;
+    }
+
+    function goalValue(g) {
+      if (g.mode === 'manual') return g.manualCurrent || 0;
+      return (g.linkedSources || []).reduce((s, k) => s + sourceValue(k), 0);
+    }
+
+    // Crisp Vector Logos
+    function iciciSvg(cls = 'w-8 h-8') {
+      return '<svg viewBox="0 0 40 40" fill="none" class="' + cls + ' shrink-0"><rect width="40" height="40" rx="10" fill="#B02A30"/><path d="M11 28.5C11 21.8 15.8 14.5 24.5 11.2C21.8 15.1 20.8 19.6 21.5 23.4C24.2 21.1 26.8 17.6 29 13.5C29.4 20.6 25.4 27.2 18.6 29.4C15.8 30.3 13 29.8 11 28.5Z" fill="#F37021"/><circle cx="24.5" cy="11.2" r="2.2" fill="#FFF7ED"/></svg>';
+    }
+    function hdfcSvg(cls = 'w-8 h-8') {
+      return '<svg viewBox="0 0 40 40" fill="none" class="' + cls + ' shrink-0"><rect width="40" height="40" rx="10" fill="#004C8F"/><rect x="8" y="8" width="24" height="24" rx="2" fill="#ED1C24"/><rect x="13" y="13" width="14" height="14" fill="#FFFFFF"/><rect x="18.6" y="8" width="2.8" height="24" fill="#FFFFFF"/><rect x="8" y="18.6" width="24" height="2.8" fill="#FFFFFF"/><rect x="16.5" y="16.5" width="7" height="7" fill="#004C8F"/></svg>';
+    }
+    function mt5Svg() {
+      return '<svg viewBox="0 0 40 40" fill="none" class="w-8 h-8 shrink-0"><rect width="40" height="40" rx="10" fill="#0F766E"/><path d="M11 27V18M11 18L15.5 22L20 14L24.5 19.5L29 12" stroke="#5EEAD4" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><rect x="10" y="23" width="3" height="6" rx="1" fill="#FDE68A"/><rect x="18.5" y="18" width="3" height="11" rx="1" fill="#99F6E4"/><rect x="27" y="15" width="3" height="14" rx="1" fill="#FDE68A"/></svg>';
+    }
+    function investSvg() {
+      return '<svg viewBox="0 0 40 40" fill="none" class="w-8 h-8 shrink-0"><rect width="40" height="40" rx="10" fill="#92400E"/><path d="M20 9L30 14.5V17H10V14.5L20 9Z" fill="#FDE68A"/><rect x="12" y="19" width="3" height="9" rx="1" fill="#FEF3C7"/><rect x="18.5" y="19" width="3" height="9" rx="1" fill="#FEF3C7"/><rect x="25" y="19" width="3" height="9" rx="1" fill="#FEF3C7"/><rect x="10" y="29" width="20" height="2.5" rx="1" fill="#F59E0B"/></svg>';
+    }
+
+    const icons = {
+      pencil: '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+      trash: '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+      check: '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>',
+      plus: '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5v14"/></svg>',
+      arrowUpRight: '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7M7 7h10v10"/></svg>'
+    };
+
+    function openModal(title, subtitle, bodyHtml) {
+      const root = document.getElementById('modalRoot');
+      root.innerHTML = `
+        <div class="w-full sm:max-w-lg max-h-[90dvh] flex flex-col rounded-t-3xl sm:rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
+          <div class="sm:hidden pt-2.5 pb-1 flex justify-center"><div class="w-10 h-1 rounded-full bg-slate-300 dark:bg-slate-700"></div></div>
+          <div class="flex items-start justify-between gap-4 px-5 py-4 border-b border-slate-200/80 dark:border-white/10">
+            <div class="min-w-0">
+              <h3 class="text-base font-semibold text-slate-900 dark:text-white truncate">${esc(title)}</h3>
+              ${subtitle ? '<p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">' + esc(subtitle) + '</p>' : ''}
+            </div>
+            <button type="button" onclick="closeModal()" class="min-h-[44px] min-w-[44px] -mr-2 -my-2 flex items-center justify-center rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">✕</button>
+          </div>
+          <div class="p-5 overflow-y-auto">${bodyHtml}</div>
+        </div>
+      `;
+      root.classList.remove('hidden');
+    }
+
+    window.closeModal = () => {
+      document.getElementById('modalRoot').classList.add('hidden');
+    };
+
+    function renderNav() {
+      const items = [
+        { id: 'wealth', label: 'Wealth', svg: '<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>' },
+        { id: 'banks', label: 'Banks', svg: '<line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/>' },
+        { id: 'goals', label: 'Goals', svg: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>' },
+        { id: 'expenses', label: 'Expenses', svg: '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/>' },
+        { id: 'calendar', label: 'Calendar', svg: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>' }
+      ];
+      document.getElementById('bottomNav').innerHTML = items.map(it => {
+        const active = activeTab === it.id;
+        return `<button type="button" onclick="setTab('${it.id}')" class="min-h-[48px] flex flex-col items-center justify-center gap-1 rounded-xl transition-colors relative ${active ? 'text-sky-600 dark:text-sky-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}">
+          ${active ? '<span class="absolute top-0.5 w-6 h-0.5 rounded-full bg-sky-500 dark:bg-sky-400"></span>' : ''}
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${it.svg}</svg>
+          <span class="text-[11px] font-medium tracking-tight whitespace-nowrap shrink-0">${it.label}</span>
+        </button>`;
+      }).join('');
+    }
+
+    window.setTab = (id) => { activeTab = id; render(); };
+
+    function render() {
+      renderNav();
+      const root = document.getElementById('appRoot');
+      if (activeTab === 'wealth') root.innerHTML = renderWealth();
+      else if (activeTab === 'banks') root.innerHTML = renderBanks();
+      else if (activeTab === 'goals') root.innerHTML = renderGoals();
+      else if (activeTab === 'expenses') root.innerHTML = renderExpenses();
+      else root.innerHTML = renderCalendar();
+    }
+
+    function renderWealth() {
+      const icici = bankMetrics(state.banks.icici);
+      const hdfc = bankMetrics(state.banks.hdfc);
+      const totalBanks = icici.balance + hdfc.balance;
+      const trading = state.investments.mt5 || 0;
+      const totalInv = (state.investments.fd || 0) + (state.investments.pf || 0);
+      const gross = totalBanks + trading + totalInv;
+      const ccDue = state.creditCardExpenses.filter(c => !c.isPaid).reduce((s, c) => s + c.amount, 0);
+      const netWorth = gross - ccDue;
+      const expectedTotal = state.expectedExpenses.reduce((s, e) => s + e.amount, 0);
+      const editExp = editingExpId ? state.expectedExpenses.find(e => e.id === editingExpId) : null;
+
+      return `
+        <div class="space-y-6">
+          <section class="glass-card rounded-3xl p-6 sm:p-8">
+            <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
+              <div>
+                <p class="text-xs font-medium tracking-[0.14em] uppercase text-amber-600 dark:text-[#F4C95D]">Total Net Worth</p>
+                <h1 class="font-light tracking-tight text-[clamp(2.5rem,7vw,4rem)] leading-[1.06] text-slate-900 dark:text-white mt-2 tabular-nums">${inr(netWorth)}</h1>
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 text-xs sm:text-sm text-slate-600 dark:text-white/80 tabular-nums font-light">
+                  <span>Gross Assets ${inr(gross)}</span>
+                  <span aria-hidden="true">·</span>
+                  <span>Credit Dues ${inr(ccDue)}</span>
+                </div>
+              </div>
+              <div class="grid grid-cols-3 gap-3 sm:gap-5 pt-4 lg:pt-0 border-t lg:border-t-0 border-slate-200/70 dark:border-white/10">
+                <div><p class="text-xs text-slate-600 dark:text-white/75">Banks</p><p class="text-sm sm:text-base font-normal text-slate-900 dark:text-white tabular-nums mt-0.5">${inr(totalBanks)}</p></div>
+                <div><p class="text-xs text-slate-600 dark:text-white/75">Trading</p><p class="text-sm sm:text-base font-normal text-slate-900 dark:text-white tabular-nums mt-0.5">${inr(trading)}</p></div>
+                <div><p class="text-xs text-slate-600 dark:text-white/75">FD &amp; PF</p><p class="text-sm sm:text-base font-normal text-slate-900 dark:text-white tabular-nums mt-0.5">${inr(totalInv)}</p></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div class="glass-card rounded-2xl p-5 lg:col-span-6 flex flex-col justify-between">
+              <div class="flex items-center justify-between gap-3 mb-4">
+                <div><h2 class="text-base font-semibold text-slate-900 dark:text-white">Bank Accounts</h2><p class="text-xs text-slate-600 dark:text-white/75 mt-0.5 tabular-nums">Combined ${inr(totalBanks)}</p></div>
+                <button type="button" onclick="setTab('banks')" class="min-h-[44px] px-3 py-2 rounded-xl text-xs font-medium text-sky-600 dark:text-sky-400 hover:bg-sky-500/10 inline-flex items-center gap-1 whitespace-nowrap shrink-0">Manage Banks ${icons.arrowUpRight}</button>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button type="button" onclick="setTab('banks')" class="glass-sub rounded-xl p-4 text-left hover:border-sky-500/40 transition-colors">
+                  <div class="flex items-center justify-between gap-2"><div class="flex items-center gap-2.5">${iciciSvg()}<span class="text-sm font-semibold dark:text-white">ICICI Bank</span></div>${icons.arrowUpRight}</div>
+                  <p class="text-xl font-light text-slate-900 dark:text-white tabular-nums mt-3">${inr(icici.balance)}</p>
+                  <div class="flex items-center justify-between text-xs mt-2 pt-2 border-t border-slate-200/70 dark:border-white/10 tabular-nums">
+                    <span class="text-emerald-600 dark:text-emerald-400">Free ${inr(icici.available)}</span>
+                    <span class="text-sky-600 dark:text-sky-400">Yet ${inr(icici.yetToSpend)}</span>
+                  </div>
+                </button>
+                <button type="button" onclick="setTab('banks')" class="glass-sub rounded-xl p-4 text-left hover:border-sky-500/40 transition-colors">
+                  <div class="flex items-center justify-between gap-2"><div class="flex items-center gap-2.5">${hdfcSvg()}<span class="text-sm font-semibold dark:text-white">HDFC Bank</span></div>${icons.arrowUpRight}</div>
+                  <p class="text-xl font-light text-slate-900 dark:text-white tabular-nums mt-3">${inr(hdfc.balance)}</p>
+                  <div class="flex items-center justify-between text-xs mt-2 pt-2 border-t border-slate-200/70 dark:border-white/10 tabular-nums">
+                    <span class="text-emerald-600 dark:text-emerald-400">Free ${inr(hdfc.available)}</span>
+                    <span class="text-sky-600 dark:text-sky-400">Yet ${inr(hdfc.yetToSpend)}</span>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            <div class="glass-card rounded-2xl p-5 lg:col-span-3 flex flex-col justify-between">
+              <div class="flex items-start justify-between gap-2">
+                <div class="flex items-center gap-2.5">${mt5Svg()}<div><h2 class="text-base font-semibold dark:text-white">Trading Capital</h2><p class="text-xs text-slate-600 dark:text-white/75">MT5 Equity</p></div></div>
+                <button type="button" onclick="openAssetModal('mt5')" class="min-h-[44px] min-w-[44px] -mr-2 -mt-2 flex items-center justify-center rounded-xl text-slate-400 hover:text-white">${icons.pencil}</button>
+              </div>
+              <div class="mt-5">
+                <p class="text-2xl font-light text-slate-900 dark:text-white tabular-nums">${inr(trading)}</p>
+                <button type="button" onclick="openAssetModal('mt5')" class="mt-3 text-xs font-medium text-sky-600 dark:text-sky-400 hover:underline min-h-[44px] inline-flex items-center">Update MT5 Capital</button>
+              </div>
+            </div>
+
+            <div class="glass-card rounded-2xl p-5 lg:col-span-3 flex flex-col justify-between">
+              <div class="flex items-center gap-2.5 mb-4">${investSvg()}<div><h2 class="text-base font-semibold dark:text-white">Investments</h2><p class="text-xs text-slate-600 dark:text-white/75 tabular-nums font-light">Total ${inr(totalInv)}</p></div></div>
+              <div class="space-y-2.5">
+                <button type="button" onclick="openAssetModal('fd')" class="w-full glass-sub rounded-xl px-3.5 py-2.5 flex items-center justify-between hover:border-sky-500/40 min-h-[48px]">
+                  <div class="text-left"><span class="text-xs text-slate-600 dark:text-white/75 block">Fixed Deposit (FD)</span><span class="text-sm font-normal dark:text-white tabular-nums">${inr(state.investments.fd || 0)}</span></div>
+                  <span class="text-slate-400">${icons.pencil}</span>
+                </button>
+                <button type="button" onclick="openAssetModal('pf')" class="w-full glass-sub rounded-xl px-3.5 py-2.5 flex items-center justify-between hover:border-sky-500/40 min-h-[48px]">
+                  <div class="text-left"><span class="text-xs text-slate-600 dark:text-white/75 block">Provident Fund (PF)</span><span class="text-sm font-normal dark:text-white tabular-nums">${inr(state.investments.pf || 0)}</span></div>
+                  <span class="text-slate-400">${icons.pencil}</span>
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <div class="glass-card rounded-2xl p-5 lg:col-span-6">
+              <div class="flex items-center justify-between gap-2 mb-4">
+                <div><h2 class="text-base font-semibold dark:text-white">Expected Monthly Expenses</h2><p class="text-xs text-slate-600 dark:text-white/75 mt-0.5">Planned recurring outlays for the month</p></div>
+                <span class="text-xs text-slate-600 dark:text-white/75 tabular-nums">${state.expectedExpenses.length} items</span>
+              </div>
+              <form onsubmit="saveExpectedInline(event)" class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 mb-4">
+                <input id="wExpTitle" value="${editExp ? esc(editExp.title) : ''}" placeholder="Expense name (e.g. Rent)" required class="sm:col-span-5 h-11 px-3.5 rounded-xl bg-white/80 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm dark:text-white" />
+                <input id="wExpAmt" type="number" min="1" value="${editExp ? editExp.amount : ''}" placeholder="Amount ₹" required class="sm:col-span-3 h-11 px-3.5 rounded-xl bg-white/80 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm tabular-nums dark:text-white" />
+                <select id="wExpBank" class="sm:col-span-2 h-11 px-2.5 rounded-xl bg-white/80 dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-sm dark:text-white">
+                  <option value="icici" ${editExp && editExp.bankId === 'icici' ? 'selected' : ''}>ICICI</option>
+                  <option value="hdfc" ${editExp && editExp.bankId === 'hdfc' ? 'selected' : ''}>HDFC</option>
+                </select>
+                <button type="submit" class="sm:col-span-2 h-11 px-3 rounded-xl bg-slate-900 dark:bg-sky-400 text-white dark:text-slate-950 font-semibold text-sm">${editExp ? 'Save' : 'Add'}</button>
+              </form>
+              <div class="divide-y divide-slate-200/70 dark:divide-white/10">
+                ${state.expectedExpenses.length === 0 ? '<p class="text-sm text-slate-500 dark:text-white/70 py-6 text-center">No expected expenses added yet.</p>' : state.expectedExpenses.map(e => `
+                  <div class="py-3 flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                      <p class="text-sm font-medium truncate ${e.isPaid ? 'line-through text-slate-400 dark:text-white/40' : 'text-slate-900 dark:text-white'}">${esc(e.title)}</p>
+                      <p class="text-xs text-slate-600 dark:text-white/70 mt-0.5">${e.bankId.toUpperCase()} · ${e.isPaid ? 'Paid' : 'Planned'}</p>
+                    </div>
+                    <div class="flex items-center gap-1 shrink-0">
+                      <span class="text-sm font-normal dark:text-white tabular-nums mr-1">${inr(e.amount)}</span>
+                      <button type="button" onclick="startEditExpectedInline('${e.id}')" class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-400 hover:text-white">${icons.pencil}</button>
+                      <button type="button" onclick="deleteExpected('${e.id}')" class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-400 hover:text-rose-500">${icons.trash}</button>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+              <div class="mt-4 pt-3.5 border-t border-slate-200 dark:border-white/15 flex items-center justify-between">
+                <span class="text-sm font-semibold dark:text-white">Total Expected Monthly Expenses</span>
+                <span class="text-lg font-normal text-sky-600 dark:text-sky-400 tabular-nums">${inr(expectedTotal)}</span>
+              </div>
+            </div>
+
+            <div class="lg:col-span-6 space-y-4">
+              ${['icici_cc', 'hdfc_cc'].map(cardId => {
+                const isIcici = cardId === 'icici_cc';
+                const cardName = isIcici ? 'ICICI Credit Card' : 'HDFC Credit Card';
+                const items = state.creditCardExpenses.filter(c => c.card === cardId);
+                const unpaid = items.filter(c => !c.isPaid).reduce((s, c) => s + c.amount, 0);
+                return `
+                  <div class="glass-card rounded-2xl p-5">
+                    <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                      <div class="flex items-center gap-3">
+                        ${isIcici ? iciciSvg('w-9 h-9') : hdfcSvg('w-9 h-9')}
+                        <div><h3 class="text-base font-semibold dark:text-white">${cardName}</h3><p class="text-xs text-slate-600 dark:text-white/75 tabular-nums">Unpaid Bill ${inr(unpaid)}</p></div>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        ${unpaid > 0 ? '<button type="button" onclick="settleCard(\'' + cardId + '\')" class="min-h-[44px] px-3 py-2 rounded-xl text-xs font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20">Settle via ' + (isIcici ? 'ICICI' : 'HDFC') + '</button>' : ''}
+                        <button type="button" onclick="openAddCcModal('${cardId}')" class="min-h-[44px] px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900 dark:bg-sky-400 text-white dark:text-slate-950">+ Add Spend</button>
+                      </div>
+                    </div>
+                    ${items.length === 0 ? '<p class="text-xs text-slate-500 dark:text-white/70 py-4 text-center">No expenses logged.</p>' : '<div class="divide-y divide-slate-200/70 dark:divide-white/10">' + items.map(c => `
+                      <div class="py-2.5 flex items-center justify-between gap-2">
+                        <button type="button" onclick="toggleCc('${c.id}')" class="flex items-center gap-2.5 min-w-0 text-left flex-1">
+                          <span class="w-5 h-5 rounded-md border flex items-center justify-center shrink-0 ${c.isPaid ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 dark:border-slate-500'}">${c.isPaid ? icons.check : ''}</span>
+                          <div class="min-w-0">
+                            <p class="text-sm font-medium truncate ${c.isPaid ? 'line-through text-slate-400 dark:text-white/40' : 'dark:text-white'}">${esc(c.title)}</p>
+                            <p class="text-xs text-slate-600 dark:text-white/70">${fmtDate(c.date)} · ${c.isPaid ? 'Paid' : 'Pending'}</p>
+                          </div>
+                        </button>
+                        <div class="flex items-center gap-1 shrink-0">
+                          <span class="text-sm font-normal dark:text-white tabular-nums">${inr(c.amount)}</span>
+                          <button type="button" onclick="deleteCc('${c.id}')" class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-400 hover:text-rose-500">${icons.trash}</button>
+                        </div>
+                      </div>
+                    `).join('') + '</div>'}
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </section>
+        </div>
+      `;
+    }
+
+    function renderBanks() {
+      return `
+        <div class="space-y-6">
+          <div>
+            <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Bank Accounts</h1>
+            <p class="text-xs sm:text-sm text-slate-600 dark:text-white/75 mt-1">Enter total bank balance and segregate funds into planned expenses (sky blue) and available reserves (green).</p>
+          </div>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            ${['icici', 'hdfc'].map(bId => {
+              const bank = state.banks[bId];
+              const m = bankMetrics(bank);
+              const total = Math.max(1, m.balance);
+              const freePct = Math.max(0, Math.min(100, (m.available / total) * 100));
+              const yetPct = Math.max(0, Math.min(100 - freePct, (m.yetToSpend / total) * 100));
+              return `
+                <section class="glass-card rounded-3xl p-5 sm:p-6 space-y-5">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="flex items-center gap-3.5">
+                      ${bId === 'icici' ? iciciSvg('w-11 h-11') : hdfcSvg('w-11 h-11')}
+                      <div><h2 class="text-lg font-semibold dark:text-white">${esc(bank.name)}</h2><p class="text-xs text-slate-600 dark:text-white/75">${bank.categories.length} segregated categories</p></div>
+                    </div>
+                    <button type="button" onclick="openBankBalModal('${bId}')" class="min-h-[44px] px-3.5 py-2 rounded-xl glass-sub text-xs font-medium dark:text-white">Edit Balance</button>
+                  </div>
+                  <div class="glass-sub rounded-2xl p-4 space-y-3.5">
+                    <div class="flex items-baseline justify-between gap-2"><span class="text-xs font-medium text-slate-600 dark:text-white/75">Current Bank Balance</span><span class="text-2xl sm:text-3xl font-light dark:text-white tabular-nums">${inr(m.balance)}</span></div>
+                    <div class="h-2.5 w-full rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden flex"><div style="width:${freePct}%" class="bg-emerald-500"></div><div style="width:${yetPct}%" class="bg-sky-400"></div></div>
+                    <div class="grid grid-cols-2 gap-3 pt-1">
+                      <div class="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2.5"><p class="text-[11px] font-medium text-emerald-700 dark:text-emerald-300">Available Balance</p><p class="text-base sm:text-lg font-normal tabular-nums mt-0.5 ${m.available < 0 ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400'}">${inr(m.available)}</p></div>
+                      <div class="rounded-xl bg-sky-500/10 border border-sky-500/20 px-3 py-2.5"><p class="text-[11px] font-medium text-sky-700 dark:text-sky-300">Yet to Spend</p><p class="text-base sm:text-lg font-normal text-sky-600 dark:text-sky-400 tabular-nums mt-0.5">${inr(m.yetToSpend)}</p></div>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="flex items-center justify-between gap-2 mb-3"><h3 class="text-sm font-semibold dark:text-white">Category Segregation</h3><button type="button" onclick="openCatModal('${bId}', null)" class="min-h-[44px] px-3 py-2 rounded-xl bg-slate-900 dark:bg-sky-400 text-white dark:text-slate-950 text-xs font-semibold">+ Add Category</button></div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      ${bank.categories.map(cat => {
+                        const rem = Math.max(0, cat.allocated - cat.spent);
+                        const isExp = cat.kind === 'expense';
+                        const pct = cat.allocated > 0 ? Math.min(100, Math.round((cat.spent / cat.allocated) * 100)) : 0;
+                        return `
+                          <div class="glass-sub rounded-2xl p-3.5 flex flex-col justify-between gap-2.5">
+                            <div class="flex items-start justify-between gap-2">
+                              <div class="min-w-0"><p class="text-sm font-semibold dark:text-white truncate">${esc(cat.name)}</p><p class="text-[11px] font-medium mt-0.5 ${isExp ? 'text-sky-600 dark:text-sky-400' : 'text-emerald-600 dark:text-emerald-400'}">${isExp ? 'Planned Expense' : 'Savings Reserve'}</p></div>
+                              <div class="flex shrink-0 -mr-1.5 -mt-1.5">
+                                <button type="button" onclick="openCatModal('${bId}', '${cat.id}')" class="min-h-[40px] min-w-[40px] flex items-center justify-center text-slate-400 hover:text-white">${icons.pencil}</button>
+                                <button type="button" onclick="deleteCat('${bId}', '${cat.id}')" class="min-h-[40px] min-w-[40px] flex items-center justify-center text-slate-400 hover:text-rose-500">${icons.trash}</button>
+                              </div>
+                            </div>
+                            <div>
+                              <div class="flex justify-between text-xs tabular-nums"><span class="text-slate-600 dark:text-white/75">Left ${inr(rem)}</span><span class="font-semibold dark:text-white">${inr(cat.allocated)}</span></div>
+                              ${isExp ? '<div class="mt-1.5 h-1.5 w-full rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden"><div style="width:' + pct + '%" class="h-full bg-sky-400 rounded-full"></div></div>' : ''}
+                              <div class="flex items-center justify-between mt-2.5 pt-2 border-t border-slate-200/70 dark:border-white/10">
+                                <span class="text-[11px] text-slate-600 dark:text-white/75 tabular-nums">Spent ${inr(cat.spent)}</span>
+                                <button type="button" onclick="openQuickSpendModal('${bId}', '${cat.id}')" class="min-h-[36px] px-2.5 py-1 rounded-lg text-xs font-medium text-sky-600 dark:text-sky-300 hover:bg-sky-500/15">Spend</button>
+                              </div>
+                            </div>
+                          </div>
+                        `;
+                      }).join('')}
+                    </div>
+                  </div>
+                </section>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderGoals() {
+      return `
+        <div class="space-y-6">
+          <div class="flex flex-wrap items-end justify-between gap-3">
+            <div><h1 class="text-2xl sm:text-3xl font-bold tracking-tight dark:text-white">Financial Goals</h1><p class="text-xs sm:text-sm text-slate-600 dark:text-white/75 mt-1">Track manual targets or auto-sync progress directly from ICICI, HDFC, MT5, PF, and FD.</p></div>
+            <button type="button" onclick="openGoalModal(null)" class="min-h-[44px] px-4 py-2 rounded-xl bg-slate-900 dark:bg-sky-400 text-white dark:text-slate-950 text-xs sm:text-sm font-semibold">+ New Goal</button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            ${state.goals.map(g => {
+              const cur = goalValue(g);
+              const pct = g.targetAmount > 0 ? Math.min(100, Math.round((cur / g.targetAmount) * 100)) : 0;
+              const d = daysLeft(g.targetDate);
+              const done = cur >= g.targetAmount;
+              return `
+                <article class="glass-card rounded-2xl p-5 flex flex-col justify-between gap-4">
+                  <div>
+                    <div class="flex items-start justify-between gap-2">
+                      <div class="min-w-0">
+                        <h2 class="text-base font-semibold dark:text-white truncate">${esc(g.name)}</h2>
+                        <p class="text-xs text-slate-600 dark:text-white/70 mt-1">${fmtDate(g.targetDate)} · <span class="font-medium ${d < 0 ? 'text-rose-500' : d <= 14 ? 'text-sky-500' : 'text-emerald-600 dark:text-emerald-400'}">${daysLabel(d)}</span></p>
+                      </div>
+                      <div class="flex shrink-0 -mr-2 -mt-2">
+                        <button type="button" onclick="openGoalModal('${g.id}')" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-white">${icons.pencil}</button>
+                        <button type="button" onclick="deleteGoal('${g.id}')" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-rose-500">${icons.trash}</button>
+                      </div>
+                    </div>
+                    <div class="mt-4">
+                      <div class="flex items-baseline justify-between gap-2 tabular-nums">
+                        <span class="text-xl font-light dark:text-white">${inr(cur)}</span>
+                        <span class="text-xs font-normal text-slate-600 dark:text-white/70">of ${inr(g.targetAmount)}</span>
+                      </div>
+                      <div class="mt-2 h-2.5 w-full rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden"><div style="width:${pct}%" class="h-full rounded-full bg-gradient-to-r from-sky-400 via-cyan-400 to-emerald-500"></div></div>
+                      <div class="flex justify-between mt-1.5 text-xs tabular-nums">
+                        <span class="font-semibold ${done ? 'text-emerald-600 dark:text-emerald-400' : 'text-sky-600 dark:text-sky-400'}">${pct}% ${done ? 'Achieved' : 'Funded'}</span>
+                        <span class="text-slate-600 dark:text-white/70">${done ? 'Target met' : inr(Math.max(0, g.targetAmount - cur)) + ' left'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="pt-3 border-t border-slate-200/70 dark:border-white/10 flex items-center justify-between gap-2">
+                    ${g.mode === 'linked' ? '<p class="text-xs text-slate-600 dark:text-white/70 truncate">Auto-linked: ' + (g.linkedSources.length === 5 ? 'All Wealth Sources' : g.linkedSources.map(s => s.toUpperCase()).join(' · ') || 'None') + '</p>' : '<span class="text-xs text-slate-600 dark:text-white/70">Manual entry</span><div class="flex gap-1.5"><button type="button" onclick="bumpManualGoal(\'' + g.id + '\', 5000)" class="min-h-[36px] px-2.5 rounded-lg glass-sub text-xs font-medium text-emerald-500">+₹5,000</button><button type="button" onclick="openGoalModal(\'' + g.id + '\')" class="min-h-[36px] px-2.5 rounded-lg glass-sub text-xs font-medium dark:text-white">Update</button></div>'}
+                  </div>
+                </article>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderExpenses() {
+      const paidCount = state.expectedExpenses.filter(e => e.isPaid).length;
+      const totalLogged = state.expenseEntries.reduce((s, e) => s + e.amount, 0);
+      return `
+        <div class="space-y-6">
+          <div><h1 class="text-2xl sm:text-3xl font-bold tracking-tight dark:text-white">Expenses &amp; Budgets</h1><p class="text-xs sm:text-sm text-slate-600 dark:text-white/75 mt-1">Tick planned expenses or log a manual spend to deduct automatically from your bank balance and budget category.</p></div>
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <div class="lg:col-span-6 space-y-6">
+              <section class="glass-card rounded-2xl p-5">
+                <h2 class="text-base font-semibold dark:text-white mb-1">Log New Spent Entry</h2>
+                <p class="text-xs text-slate-600 dark:text-white/75 mb-4">Select payment source and budget category to track spending</p>
+                <form onsubmit="submitSpentEntry(event)" class="space-y-3">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div><label class="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">Expense Name</label><input id="spTitle" required placeholder="e.g. Supermarket, Petrol" class="w-full h-11 px-3.5 rounded-xl bg-white/80 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm dark:text-white" /></div>
+                    <div><label class="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">Amount (INR ₹)</label><input id="spAmt" type="number" min="1" required placeholder="0" class="w-full h-11 px-3.5 rounded-xl bg-white/80 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm tabular-nums dark:text-white" /></div>
+                  </div>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label class="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">Payment Source</label>
+                      <select id="spSource" class="w-full h-11 px-3 rounded-xl bg-white/80 dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-sm dark:text-white">
+                        <option value="icici">ICICI Bank (${inr(state.banks.icici.balance)})</option>
+                        <option value="hdfc">HDFC Bank (${inr(state.banks.hdfc.balance)})</option>
+                        <option value="icici_cc">ICICI Credit Card</option>
+                        <option value="hdfc_cc">HDFC Credit Card</option>
+                      </select>
+                    </div>
+                    <div>
+                      <div class="flex items-center justify-between mb-1"><label class="block text-xs font-medium text-slate-600 dark:text-slate-300">Budget Category</label><button type="button" onclick="openQuickBudgetModal()" class="text-[11px] font-semibold text-sky-600 dark:text-sky-400 hover:underline">+ New Category</button></div>
+                      <select id="spCat" class="w-full h-11 px-3 rounded-xl bg-white/80 dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-sm dark:text-white">
+                        <optgroup label="ICICI Bank Categories">
+                          ${state.banks.icici.categories.map(c => '<option value="icici|' + c.id + '">ICICI · ' + esc(c.name) + ' (Left ' + inr(Math.max(0, c.allocated - c.spent)) + ')</option>').join('')}
+                        </optgroup>
+                        <optgroup label="HDFC Bank Categories">
+                          ${state.banks.hdfc.categories.map(c => '<option value="hdfc|' + c.id + '">HDFC · ' + esc(c.name) + ' (Left ' + inr(Math.max(0, c.allocated - c.spent)) + ')</option>').join('')}
+                        </optgroup>
+                        <option value="">General / Uncategorized</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div><label class="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">Date</label><input id="spDate" type="date" value="${todayIso()}" class="w-full h-11 px-3.5 rounded-xl bg-white/80 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm dark:text-white" /></div>
+                  <button type="submit" class="w-full h-11 rounded-xl bg-slate-900 dark:bg-sky-400 text-white dark:text-slate-950 text-sm font-semibold">+ Record Spent Entry</button>
+                </form>
+              </section>
+
+              <section class="glass-card rounded-2xl p-5">
+                <div class="flex items-center justify-between gap-2 mb-3">
+                  <div><h2 class="text-base font-semibold dark:text-white">Planned Expenses Checklist</h2><p class="text-xs text-slate-600 dark:text-white/75">${paidCount}/${state.expectedExpenses.length} paid · Tick to deduct or pencil to edit</p></div>
+                  <button type="button" onclick="openPlannedModal(null)" class="min-h-[40px] px-3 rounded-xl glass-sub text-xs font-semibold text-sky-600 dark:text-sky-400">+ Add</button>
+                </div>
+                <div class="divide-y divide-slate-200/70 dark:divide-white/10">
+                  ${state.expectedExpenses.map(e => `
+                    <div class="py-2.5 flex items-center justify-between gap-2">
+                      <button type="button" onclick="togglePlanned('${e.id}')" class="flex-1 min-w-0 min-h-[48px] flex items-center gap-3 text-left">
+                        <span class="w-6 h-6 rounded-lg border flex items-center justify-center shrink-0 ${e.isPaid ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 dark:border-slate-500'}">${e.isPaid ? icons.check : ''}</span>
+                        <div class="min-w-0 flex-1">
+                          <p class="text-sm font-medium truncate ${e.isPaid ? 'line-through text-slate-400 dark:text-white/40' : 'dark:text-white'}">${esc(e.title)}</p>
+                          <p class="text-xs text-slate-600 dark:text-white/70">${e.bankId.toUpperCase()} · ${e.isPaid ? 'Deducted' : 'Pending'}</p>
+                        </div>
+                      </button>
+                      <div class="flex items-center gap-1 shrink-0">
+                        <span class="text-sm font-normal dark:text-white tabular-nums">${inr(e.amount)}</span>
+                        <button type="button" onclick="openPlannedModal('${e.id}')" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-white">${icons.pencil}</button>
+                      </div>
+                    </div>
+                  `).join('')}
+                </div>
+              </section>
+            </div>
+
+            <div class="lg:col-span-6 space-y-6">
+              <section class="glass-card rounded-2xl p-5">
+                <div class="flex items-center justify-between mb-3"><h2 class="text-base font-semibold dark:text-white">Category Budget Utilization</h2><button type="button" onclick="openQuickBudgetModal()" class="text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline">+ Add Budget</button></div>
+                <div class="space-y-4">
+                  ${['icici', 'hdfc'].map(bId => {
+                    const bank = state.banks[bId];
+                    const cats = bank.categories.filter(c => c.kind === 'expense');
+                    if (!cats.length) return '';
+                    return '<div class="space-y-2.5"><p class="text-xs font-semibold text-slate-600 dark:text-white/75">' + esc(bank.name) + '</p>' + cats.map(c => {
+                      const pct = c.allocated > 0 ? Math.min(100, Math.round((c.spent / c.allocated) * 100)) : 0;
+                      return '<div class="glass-sub rounded-xl p-3"><div class="flex justify-between text-xs mb-1.5"><span class="font-medium dark:text-white">' + esc(c.name) + '</span><span class="tabular-nums text-slate-600 dark:text-white/80">' + inr(c.spent) + ' / ' + inr(c.allocated) + '</span></div><div class="h-2 w-full rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden"><div style="width:' + pct + '%" class="h-full rounded-full ' + (c.spent > c.allocated ? 'bg-rose-500' : 'bg-sky-400') + '"></div></div></div>';
+                    }).join('') + '</div>';
+                  }).join('')}
+                </div>
+              </section>
+
+              <section class="glass-card rounded-2xl p-5">
+                <div class="flex items-center justify-between mb-3"><h2 class="text-base font-semibold dark:text-white">Spent Ledger</h2><span class="text-xs font-semibold text-slate-600 dark:text-white/80 tabular-nums">Total ${inr(totalLogged)}</span></div>
+                <div class="divide-y divide-slate-200/70 dark:divide-white/10 max-h-[380px] overflow-y-auto">
+                  ${state.expenseEntries.map(en => `
+                    <div class="py-3 flex items-center justify-between gap-3">
+                      <div class="min-w-0"><p class="text-sm font-medium dark:text-white truncate">${esc(en.title)}</p><p class="text-xs text-slate-600 dark:text-white/70 truncate">${esc(en.categoryName)} · ${en.source.toUpperCase().replace('_', ' ')} · ${fmtDate(en.date)}</p></div>
+                      <div class="flex items-center gap-1 shrink-0"><span class="text-sm font-normal text-rose-500 tabular-nums">-${inr(en.amount)}</span><button type="button" onclick="deleteEntry('${en.id}')" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-rose-500">${icons.trash}</button></div>
+                    </div>
+                  `).join('')}
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderCalendar() {
+      const firstDay = new Date(calYear, calMonth, 1).getDay();
+      const totalDays = new Date(calYear, calMonth + 1, 0).getDate();
+      const monthName = new Date(calYear, calMonth, 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+      const today = todayIso();
+      const pending = state.bills.filter(b => !b.isDone).reduce((s, b) => s + b.amount, 0);
+      const sorted = [...state.bills].sort((a, b) => (a.isDone !== b.isDone ? (a.isDone ? 1 : -1) : a.dueDate.localeCompare(b.dueDate)));
+      const list = calSelected ? sorted.filter(b => b.dueDate === calSelected) : sorted;
+
+      let cells = '';
+      for (let i = 0; i < firstDay; i++) cells += '<div class="min-h-[48px]"></div>';
+      for (let d = 1; d <= totalDays; d++) {
+        const iso = calYear + '-' + String(calMonth + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+        const dayBills = state.bills.filter(b => b.dueDate === iso);
+        const hasOverdue = dayBills.some(b => !b.isDone && b.dueDate < today);
+        const hasUnpaid = dayBills.some(b => !b.isDone);
+        const allDone = dayBills.length > 0 && dayBills.every(b => b.isDone);
+        const isSel = calSelected === iso;
+        const isTod = iso === today;
+        cells += `
+          <button type="button" onclick="selectCal('${iso}')" class="min-h-[48px] sm:min-h-[54px] rounded-xl flex flex-col items-center justify-center gap-1 border tabular-nums ${isSel ? 'bg-slate-900 dark:bg-sky-400 text-white dark:text-slate-950 font-bold' : isTod ? 'border-sky-500/60 bg-sky-500/10 dark:text-white font-semibold' : 'border-transparent hover:bg-slate-200/60 dark:hover:bg-white/5 dark:text-white'}">
+            <span class="text-xs sm:text-sm">${d}</span>
+            ${dayBills.length > 0 ? '<span class="w-1.5 h-1.5 rounded-full ' + (hasOverdue ? 'bg-rose-500' : hasUnpaid ? 'bg-sky-400' : allDone ? 'bg-emerald-500' : 'bg-slate-400') + '"></span>' : ''}
+          </button>
+        `;
+      }
+
+      return `
+        <div class="space-y-6">
+          <div class="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h1 class="text-2xl sm:text-3xl font-bold tracking-tight dark:text-white">Bills &amp; Due Calendar</h1>
+              <p class="text-xs sm:text-sm text-slate-600 dark:text-white/75 mt-1">Track WiFi, mobile recharge, insurance, and recurring due dates. Pending total <span class="font-semibold text-sky-600 dark:text-sky-400 tabular-nums">${inr(pending)}</span></p>
+            </div>
+            <button type="button" onclick="openBillModal(null)" class="min-h-[44px] px-4 py-2 rounded-xl bg-slate-900 dark:bg-sky-400 text-white dark:text-slate-950 text-xs sm:text-sm font-semibold">+ Add Bill / Due Date</button>
+          </div>
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <section class="glass-card rounded-3xl p-4 sm:p-6 lg:col-span-6">
+              <div class="flex items-center justify-between gap-2 mb-4">
+                <h2 class="text-base font-semibold dark:text-white">${monthName}</h2>
+                <div class="flex items-center gap-1">
+                  ${calSelected ? '<button type="button" onclick="selectCal(null)" class="min-h-[40px] px-2.5 rounded-xl text-xs font-medium text-sky-600 dark:text-sky-400">Show All</button>' : ''}
+                  <button type="button" onclick="shiftMonth(-1)" class="min-h-[44px] min-w-[44px] rounded-xl glass-sub dark:text-white">‹</button>
+                  <button type="button" onclick="shiftMonth(1)" class="min-h-[44px] min-w-[44px] rounded-xl glass-sub dark:text-white">›</button>
+                </div>
+              </div>
+              <div class="grid grid-cols-7 gap-1 text-center mb-1.5 text-[11px] font-medium text-slate-600 dark:text-white/65"><div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div></div>
+              <div class="grid grid-cols-7 gap-1.5">${cells}</div>
+              <div class="flex flex-wrap gap-4 mt-4 pt-3 border-t border-slate-200/70 dark:border-white/10 text-xs text-slate-600 dark:text-white/75">
+                <span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-sky-400"></span>Upcoming Due</span>
+                <span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-rose-500"></span>Overdue</span>
+                <span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500"></span>Paid</span>
+              </div>
+            </section>
+            <section class="glass-card rounded-3xl p-5 sm:p-6 lg:col-span-6">
+              <div class="flex items-center justify-between mb-4">
+                <div><h2 class="text-base font-semibold dark:text-white">${calSelected ? 'Bills on ' + fmtDate(calSelected) : 'Upcoming Payments First'}</h2><p class="text-xs text-slate-600 dark:text-white/75 mt-0.5">${calSelected ? 'Tap Show All to view complete schedule' : 'Sorted chronologically with unpaid bills on top'}</p></div>
+              </div>
+              <div class="divide-y divide-slate-200/70 dark:divide-white/10">
+                ${list.length === 0 ? '<p class="text-sm text-slate-500 dark:text-white/70 py-8 text-center">No bills found.</p>' : list.map(b => {
+                  const d = daysLeft(b.dueDate);
+                  return `
+                    <div class="py-3.5 flex items-center justify-between gap-3">
+                      <button type="button" onclick="toggleBill('${b.id}')" class="flex items-center gap-2.5 min-w-0 flex-1 text-left">
+                        <span class="w-6 h-6 rounded-lg border flex items-center justify-center shrink-0 ${b.isDone ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 dark:border-slate-500'}">${b.isDone ? icons.check : ''}</span>
+                        <div class="min-w-0 flex-1">
+                          <p class="text-sm font-medium truncate ${b.isDone ? 'line-through text-slate-400 dark:text-white/40' : 'dark:text-white'}">${esc(b.name)}</p>
+                          <p class="text-xs text-slate-600 dark:text-white/70 mt-0.5">${fmtDate(b.dueDate)} · <span class="${b.isDone ? 'text-emerald-500' : d < 0 ? 'text-rose-500' : d <= 3 ? 'text-sky-500' : ''}">${b.isDone ? 'Done' : daysLabel(d)}</span>${b.recurringMonthly ? ' · Monthly' : ''}${b.bankId ? ' · ' + b.bankId.toUpperCase() : ''}</p>
+                        </div>
+                      </button>
+                      <div class="flex items-center gap-1 shrink-0">
+                        <span class="text-sm font-normal dark:text-white tabular-nums">${inr(b.amount)}</span>
+                        <button type="button" onclick="openBillModal('${b.id}')" class="min-h-[44px] min-w-[44px] -mr-2 flex items-center justify-center rounded-xl text-slate-400 hover:text-white">${icons.pencil}</button>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </section>
+          </div>
+        </div>
+      `;
+    }
+
+    // Handlers
+    window.openAssetModal = (key) => {
+      const label = key === 'mt5' ? 'Trading Capital (MT5)' : key === 'fd' ? 'Fixed Deposit (FD)' : 'Provident Fund (PF)';
+      openModal('Update ' + label, 'Enter current total valuation in INR', `
+        <form onsubmit="saveAssetModal(event, '${key}')" class="space-y-4">
+          <input id="mAssetVal" type="number" min="0" value="${state.investments[key] || 0}" required class="w-full h-12 px-4 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-lg tabular-nums dark:text-white" />
+          <div class="flex gap-3"><button type="button" onclick="closeModal()" class="flex-1 h-11 rounded-xl border border-slate-200 dark:border-white/15 text-sm">Cancel</button><button type="submit" class="flex-1 h-11 rounded-xl bg-sky-400 text-slate-950 text-sm font-semibold">Save Value</button></div>
+        </form>
+      `);
+    };
+    window.saveAssetModal = (e, key) => { e.preventDefault(); state.investments[key] = Math.max(0, Number(mAssetVal.value) || 0); closeModal(); saveState(); };
+
+    window.saveExpectedInline = (e) => {
+      e.preventDefault();
+      const t = wExpTitle.value.trim(), a = Math.max(1, Number(wExpAmt.value) || 0), b = wExpBank.value;
+      if (!t) return;
+      if (editingExpId) {
+        state.expectedExpenses = state.expectedExpenses.map(x => x.id === editingExpId ? { ...x, title: t, amount: a, bankId: b } : x);
+        editingExpId = null;
+      } else {
+        const defCat = (state.banks[b].categories.find(c => c.kind === 'expense') || state.banks[b].categories[0])?.id;
+        state.expectedExpenses.push({ id: uid('exp'), title: t, amount: a, bankId: b, categoryId: defCat, isPaid: false });
+      }
+      saveState();
+    };
+    window.startEditExpectedInline = (id) => { editingExpId = id; render(); };
+    window.deleteExpected = (id) => { state.expectedExpenses = state.expectedExpenses.filter(x => x.id !== id); saveState(); };
+
+    window.openAddCcModal = (cardId) => {
+      openModal(cardId === 'icici_cc' ? 'Add ICICI Credit Card Expense' : 'Add HDFC Credit Card Expense', 'Tracked separately under credit card liabilities', `
+        <form onsubmit="saveCcModal(event, '${cardId}')" class="space-y-4">
+          <input id="mCcTitle" required placeholder="Description (e.g. Amazon, Dining)" class="w-full h-11 px-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm dark:text-white" />
+          <div class="grid grid-cols-2 gap-3"><input id="mCcAmt" type="number" min="1" required placeholder="Amount ₹" class="h-11 px-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm tabular-nums dark:text-white" /><input id="mCcDate" type="date" value="${todayIso()}" class="h-11 px-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm dark:text-white" /></div>
+          <div class="flex gap-3"><button type="button" onclick="closeModal()" class="flex-1 h-11 rounded-xl border border-slate-200 dark:border-white/15 text-sm">Cancel</button><button type="submit" class="flex-1 h-11 rounded-xl bg-sky-400 text-slate-950 text-sm font-semibold">Add Expense</button></div>
+        </form>
+      `);
+    };
+    window.saveCcModal = (e, cardId) => { e.preventDefault(); state.creditCardExpenses.unshift({ id: uid('cc'), card: cardId, title: mCcTitle.value.trim(), amount: Number(mCcAmt.value) || 0, date: mCcDate.value || todayIso(), isPaid: false }); closeModal(); saveState(); };
+    window.toggleCc = (id) => { state.creditCardExpenses = state.creditCardExpenses.map(c => c.id === id ? { ...c, isPaid: !c.isPaid } : c); saveState(); };
+    window.deleteCc = (id) => { state.creditCardExpenses = state.creditCardExpenses.filter(c => c.id !== id); saveState(); };
+    window.settleCard = (cardId) => {
+      const bId = cardId === 'icici_cc' ? 'icici' : 'hdfc';
+      const due = state.creditCardExpenses.filter(c => c.card === cardId && !c.isPaid).reduce((s, c) => s + c.amount, 0);
+      state.banks[bId].balance = Math.max(0, state.banks[bId].balance - due);
+      state.creditCardExpenses = state.creditCardExpenses.map(c => c.card === cardId ? { ...c, isPaid: true } : c);
+      saveState();
+    };
+
+    window.openBankBalModal = (bId) => {
+      openModal('Edit ' + state.banks[bId].name + ' Balance', 'Enter current total account balance in INR', `
+        <form onsubmit="saveBankBal(event, '${bId}')" class="space-y-4">
+          <input id="mBankBal" type="number" min="0" value="${state.banks[bId].balance}" required class="w-full h-12 px-4 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-lg tabular-nums dark:text-white" />
+          <div class="flex gap-3"><button type="button" onclick="closeModal()" class="flex-1 h-11 rounded-xl border border-slate-200 dark:border-white/15 text-sm">Cancel</button><button type="submit" class="flex-1 h-11 rounded-xl bg-sky-400 text-slate-950 text-sm font-semibold">Save Balance</button></div>
+        </form>
+      `);
+    };
+    window.saveBankBal = (e, bId) => { e.preventDefault(); state.banks[bId].balance = Math.max(0, Number(mBankBal.value) || 0); closeModal(); saveState(); };
+
+    window.openCatModal = (bId, catId) => {
+      const cat = catId ? state.banks[bId].categories.find(c => c.id === catId) : null;
+      modalCatKind = cat ? cat.kind : 'expense';
+      openModal((cat ? 'Edit ' : 'Add ') + state.banks[bId].shortName + ' Category', 'Segregate bank funds into planned expenses or savings', `
+        <form onsubmit="saveCatModal(event, '${bId}', '${catId || ''}')" class="space-y-4">
+          <input id="mCatName" value="${cat ? esc(cat.name) : ''}" placeholder="Category Name" required class="w-full h-11 px-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm dark:text-white" />
+          <input id="mCatAlloc" type="number" min="0" value="${cat ? cat.allocated : ''}" placeholder="Allocated INR ₹" required class="w-full h-11 px-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm tabular-nums dark:text-white" />
+          <div class="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-100 dark:bg-white/5">
+            <button type="button" id="btnKindExp" onclick="setModalCatKind('expense')" class="h-10 rounded-lg text-xs font-semibold ${modalCatKind === 'expense' ? 'bg-sky-400 text-slate-950' : ''}">Planned Expense</button>
+            <button type="button" id="btnKindSav" onclick="setModalCatKind('savings')" class="h-10 rounded-lg text-xs font-semibold ${modalCatKind === 'savings' ? 'bg-emerald-500 text-white' : ''}">Savings Reserve</button>
+          </div>
+          <div class="flex gap-3"><button type="button" onclick="closeModal()" class="flex-1 h-11 rounded-xl border border-slate-200 dark:border-white/15 text-sm">Cancel</button><button type="submit" class="flex-1 h-11 rounded-xl bg-sky-400 text-slate-950 text-sm font-semibold">Save</button></div>
+        </form>
+      `);
+    };
+    window.setModalCatKind = (k) => {
+      modalCatKind = k;
+      btnKindExp.className = 'h-10 rounded-lg text-xs font-semibold ' + (k === 'expense' ? 'bg-sky-400 text-slate-950' : '');
+      btnKindSav.className = 'h-10 rounded-lg text-xs font-semibold ' + (k === 'savings' ? 'bg-emerald-500 text-white' : '');
+    };
+    window.saveCatModal = (e, bId, catId) => {
+      e.preventDefault();
+      const name = mCatName.value.trim(), alloc = Math.max(0, Number(mCatAlloc.value) || 0);
+      if (catId) state.banks[bId].categories = state.banks[bId].categories.map(c => c.id === catId ? { ...c, name, allocated: alloc, kind: modalCatKind } : c);
+      else state.banks[bId].categories.push({ id: uid(bId + '_cat'), name, allocated: alloc, spent: 0, kind: modalCatKind });
+      closeModal(); saveState();
+    };
+    window.deleteCat = (bId, catId) => { state.banks[bId].categories = state.banks[bId].categories.filter(c => c.id !== catId); saveState(); };
+
+    window.openQuickSpendModal = (bId, catId) => {
+      const cat = state.banks[bId].categories.find(c => c.id === catId);
+      openModal('Spend from ' + cat.name, 'Deducts automatically from ' + state.banks[bId].name, `
+        <form onsubmit="saveQuickSpend(event, '${bId}', '${catId}')" class="space-y-4">
+          <input id="mQsNote" placeholder="Expense note (optional)" class="w-full h-11 px-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm dark:text-white" />
+          <input id="mQsAmt" type="number" min="1" placeholder="Amount Spent ₹" required class="w-full h-12 px-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-lg tabular-nums dark:text-white" />
+          <div class="flex gap-3"><button type="button" onclick="closeModal()" class="flex-1 h-11 rounded-xl border border-slate-200 dark:border-white/15 text-sm">Cancel</button><button type="submit" class="flex-1 h-11 rounded-xl bg-sky-400 text-slate-950 text-sm font-semibold">Record &amp; Deduct</button></div>
+        </form>
+      `);
+    };
+    window.saveQuickSpend = (e, bId, catId) => {
+      e.preventDefault();
+      const amt = Math.max(1, Number(mQsAmt.value) || 0);
+      const cat = state.banks[bId].categories.find(c => c.id === catId);
+      state.banks[bId].balance = Math.max(0, state.banks[bId].balance - amt);
+      state.banks[bId].categories = state.banks[bId].categories.map(c => c.id === catId ? { ...c, spent: c.spent + amt } : c);
+      state.expenseEntries.unshift({ id: uid('tx'), title: mQsNote.value.trim() || cat.name + ' Spend', amount: amt, categoryName: cat.name, source: bId, bankCategoryId: catId, budgetBankId: bId, date: todayIso() });
+      closeModal(); saveState();
+    };
+
+    window.openGoalModal = (goalId) => {
+      const g = goalId ? state.goals.find(x => x.id === goalId) : null;
+      modalGoalMode = g ? g.mode : 'linked';
+      modalLinkedSources = g ? [...g.linkedSources] : ['icici', 'hdfc'];
+      const opts = [['icici','ICICI Bank'],['hdfc','HDFC Bank'],['mt5','MT5 Trading'],['pf','PF'],['fd','FD']];
+      openModal(g ? 'Update Goal' : 'Create New Goal', 'Set target amount, expected date, and funding source', `
+        <form onsubmit="saveGoalModal(event, '${goalId || ''}')" class="space-y-4">
+          <input id="mGName" value="${g ? esc(g.name) : ''}" placeholder="Goal Name" required class="w-full h-11 px-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm dark:text-white" />
+          <div class="grid grid-cols-2 gap-3"><input id="mGAmt" type="number" min="1" value="${g ? g.targetAmount : ''}" placeholder="Target ₹" required class="h-11 px-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm tabular-nums dark:text-white" /><input id="mGDate" type="date" value="${g ? g.targetDate : todayIso()}" required class="h-11 px-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm dark:text-white" /></div>
+          <div class="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-100 dark:bg-white/5">
+            <button type="button" id="btnGLinked" onclick="setGoalMode('linked')" class="h-10 rounded-lg text-xs font-semibold ${modalGoalMode === 'linked' ? 'bg-sky-400 text-slate-950' : ''}">Link Wealth Sources</button>
+            <button type="button" id="btnGManual" onclick="setGoalMode('manual')" class="h-10 rounded-lg text-xs font-semibold ${modalGoalMode === 'manual' ? 'bg-sky-400 text-slate-950' : ''}">Manual Amount</button>
+          </div>
+          <div id="gManualBox" class="${modalGoalMode === 'manual' ? '' : 'hidden'}"><input id="mGManual" type="number" min="0" value="${g ? g.manualCurrent : 0}" placeholder="Current Saved ₹" class="w-full h-11 px-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm tabular-nums dark:text-white" /></div>
+          <div id="gLinkedBox" class="${modalGoalMode === 'linked' ? 'space-y-2' : 'hidden'}">
+            <div class="flex justify-between items-center text-xs"><span class="text-slate-500">Select Wealth Sources</span><button type="button" onclick="toggleAllGoalSources()" class="text-sky-400 font-semibold">Select / Deselect All</button></div>
+            ${opts.map(([k, lbl]) => '<label class="flex items-center justify-between px-3 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 text-sm cursor-pointer"><span class="flex items-center gap-2"><input type="checkbox" class="gSrcChk" value="' + k + '" ' + (modalLinkedSources.includes(k) ? 'checked' : '') + ' />' + lbl + '</span><span class="text-xs tabular-nums text-slate-400">' + inr(sourceValue(k)) + '</span></label>').join('')}
+          </div>
+          <div class="flex gap-3"><button type="button" onclick="closeModal()" class="flex-1 h-11 rounded-xl border border-slate-200 dark:border-white/15 text-sm">Cancel</button><button type="submit" class="flex-1 h-11 rounded-xl bg-sky-400 text-slate-950 text-sm font-semibold">Save Goal</button></div>
+        </form>
+      `);
+    };
+    window.setGoalMode = (m) => {
+      modalGoalMode = m;
+      gManualBox.classList.toggle('hidden', m !== 'manual');
+      gLinkedBox.classList.toggle('hidden', m !== 'linked');
+      btnGLinked.className = 'h-10 rounded-lg text-xs font-semibold ' + (m === 'linked' ? 'bg-sky-400 text-slate-950' : '');
+      btnGManual.className = 'h-10 rounded-lg text-xs font-semibold ' + (m === 'manual' ? 'bg-sky-400 text-slate-950' : '');
+    };
+    window.toggleAllGoalSources = () => {
+      const chks = [...document.querySelectorAll('.gSrcChk')];
+      const all = chks.every(c => c.checked);
+      chks.forEach(c => c.checked = !all);
+    };
+    window.saveGoalModal = (e, goalId) => {
+      e.preventDefault();
+      const linked = [...document.querySelectorAll('.gSrcChk:checked')].map(c => c.value);
+      const data = { id: goalId || uid('goal'), name: mGName.value.trim(), targetAmount: Math.max(1, Number(mGAmt.value) || 1), targetDate: mGDate.value || todayIso(), mode: modalGoalMode, manualCurrent: modalGoalMode === 'manual' ? Math.max(0, Number(mGManual.value) || 0) : 0, linkedSources: modalGoalMode === 'linked' ? linked : [] };
+      if (goalId) state.goals = state.goals.map(g => g.id === goalId ? data : g);
+      else state.goals.unshift(data);
+      closeModal(); saveState();
+    };
+    window.deleteGoal = (id) => { state.goals = state.goals.filter(g => g.id !== id); saveState(); };
+    window.bumpManualGoal = (id, d) => { state.goals = state.goals.map(g => g.id === id ? { ...g, manualCurrent: Math.max(0, g.manualCurrent + d) } : g); saveState(); };
+
+    window.submitSpentEntry = (e) => {
+      e.preventDefault();
+      const t = spTitle.value.trim(), amt = Math.max(1, Number(spAmt.value) || 0), src = spSource.value, dt = spDate.value || todayIso();
+      const [bBank, bCatId] = (spCat.value || '').split('|');
+      const cat = bBank && bCatId ? state.banks[bBank].categories.find(c => c.id === bCatId) : null;
+      if (bBank && cat) {
+        state.banks[bBank].categories = state.banks[bBank].categories.map(c => c.id === cat.id ? { ...c, spent: c.spent + amt } : c);
+      }
+      if (src === 'icici' || src === 'hdfc') {
+        state.banks[src].balance = Math.max(0, state.banks[src].balance - amt);
+      } else {
+        state.creditCardExpenses.unshift({ id: uid('cc'), card: src, title: t, amount: amt, date: dt, isPaid: false });
+      }
+      state.expenseEntries.unshift({ id: uid('tx'), title: t, amount: amt, categoryName: cat ? cat.name : 'General', source: src, bankCategoryId: cat?.id, budgetBankId: bBank || undefined, date: dt });
+      saveState();
+    };
+    window.deleteEntry = (id) => {
+      const en = state.expenseEntries.find(x => x.id === id);
+      if (!en) return;
+      if (en.source === 'icici' || en.source === 'hdfc') state.banks[en.source].balance += en.amount;
+      const cb = en.budgetBankId || (en.source === 'icici' || en.source === 'hdfc' ? en.source : null);
+      if (cb && en.bankCategoryId) state.banks[cb].categories = state.banks[cb].categories.map(c => c.id === en.bankCategoryId ? { ...c, spent: Math.max(0, c.spent - en.amount) } : c);
+      if (en.plannedExpenseId) state.expectedExpenses = state.expectedExpenses.map(x => x.id === en.plannedExpenseId ? { ...x, isPaid: false } : x);
+      state.expenseEntries = state.expenseEntries.filter(x => x.id !== id);
+      saveState();
+    };
+    window.togglePlanned = (id) => {
+      const ex = state.expectedExpenses.find(x => x.id === id);
+      if (!ex) return;
+      const next = !ex.isPaid;
+      ex.isPaid = next;
+      const bank = state.banks[ex.bankId];
+      const catId = ex.categoryId || (bank.categories.find(c => c.kind === 'expense') || bank.categories[0])?.id;
+      bank.balance = next ? Math.max(0, bank.balance - ex.amount) : bank.balance + ex.amount;
+      bank.categories = bank.categories.map(c => c.id === catId ? { ...c, spent: next ? c.spent + ex.amount : Math.max(0, c.spent - ex.amount) } : c);
+      if (next) state.expenseEntries.unshift({ id: uid('tx'), title: ex.title, amount: ex.amount, categoryName: bank.categories.find(c => c.id === catId)?.name || 'Planned', source: ex.bankId, bankCategoryId: catId, budgetBankId: ex.bankId, date: todayIso(), plannedExpenseId: ex.id });
+      else state.expenseEntries = state.expenseEntries.filter(x => x.plannedExpenseId !== ex.id);
+      saveState();
+    };
+    window.openPlannedModal = (id) => {
+      const ex = id ? state.expectedExpenses.find(x => x.id === id) : null;
+      openModal(ex ? 'Edit Planned Expense' : 'Add Planned Expense', 'Changes sync with Wealth overview', `
+        <form onsubmit="savePlannedModal(event, '${id || ''}')" class="space-y-4">
+          <input id="mPTitle" value="${ex ? esc(ex.title) : ''}" placeholder="Expense Name" required class="w-full h-11 px-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm dark:text-white" />
+          <div class="grid grid-cols-2 gap-3"><input id="mPAmt" type="number" min="1" value="${ex ? ex.amount : ''}" placeholder="Amount ₹" required class="h-11 px-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm tabular-nums dark:text-white" /><select id="mPBank" class="h-11 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-sm dark:text-white"><option value="icici" ${ex && ex.bankId === 'icici' ? 'selected' : ''}>ICICI Bank</option><option value="hdfc" ${ex && ex.bankId === 'hdfc' ? 'selected' : ''}>HDFC Bank</option></select></div>
+          <div class="flex gap-3">${ex ? '<button type="button" onclick="deletePlannedModal(\'' + ex.id + '\')" class="h-11 px-4 rounded-xl border border-rose-500/30 text-sm text-rose-500">Delete</button>' : ''}<button type="button" onclick="closeModal()" class="flex-1 h-11 rounded-xl border border-slate-200 dark:border-white/15 text-sm">Cancel</button><button type="submit" class="flex-1 h-11 rounded-xl bg-sky-400 text-slate-950 text-sm font-semibold">Save</button></div>
+        </form>
+      `);
+    };
+    window.savePlannedModal = (e, id) => {
+      e.preventDefault();
+      const t = mPTitle.value.trim(), a = Math.max(1, Number(mPAmt.value) || 1), b = mPBank.value;
+      const catId = (state.banks[b].categories.find(c => c.kind === 'expense') || state.banks[b].categories[0])?.id;
+      if (id) state.expectedExpenses = state.expectedExpenses.map(x => x.id === id ? { ...x, title: t, amount: a, bankId: b, categoryId: catId } : x);
+      else state.expectedExpenses.push({ id: uid('exp'), title: t, amount: a, bankId: b, categoryId: catId, isPaid: false });
+      closeModal(); saveState();
+    };
+    window.deletePlannedModal = (id) => { state.expectedExpenses = state.expectedExpenses.filter(x => x.id !== id); closeModal(); saveState(); };
+
+    window.openQuickBudgetModal = () => {
+      openModal('Add Budget Category', 'Creates a budget category on your selected bank', `
+        <form onsubmit="saveQuickBudget(event)" class="space-y-4">
+          <select id="mQbBank" class="w-full h-11 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-sm dark:text-white"><option value="icici">ICICI Bank</option><option value="hdfc">HDFC Bank</option></select>
+          <input id="mQbName" placeholder="Category Name (e.g. Dining, Travel)" required class="w-full h-11 px-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm dark:text-white" />
+          <input id="mQbAmt" type="number" min="0" placeholder="Monthly Budget ₹" required class="w-full h-11 px-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm tabular-nums dark:text-white" />
+          <div class="flex gap-3"><button type="button" onclick="closeModal()" class="flex-1 h-11 rounded-xl border border-slate-200 dark:border-white/15 text-sm">Cancel</button><button type="submit" class="flex-1 h-11 rounded-xl bg-sky-400 text-slate-950 text-sm font-semibold">Create Budget</button></div>
+        </form>
+      `);
+    };
+    window.saveQuickBudget = (e) => {
+      e.preventDefault();
+      state.banks[mQbBank.value].categories.push({ id: uid(mQbBank.value + '_cat'), name: mQbName.value.trim(), allocated: Math.max(0, Number(mQbAmt.value) || 0), spent: 0, kind: 'expense' });
+      closeModal(); saveState();
+    };
+
+    window.shiftMonth = (d) => { calMonth += d; if (calMonth < 0) { calMonth = 11; calYear--; } if (calMonth > 11) { calMonth = 0; calYear++; } render(); };
+    window.selectCal = (iso) => { calSelected = calSelected === iso ? null : iso; render(); };
+    window.toggleBill = (id) => {
+      const b = state.bills.find(x => x.id === id);
+      if (!b) return;
+      b.isDone = !b.isDone;
+      if (b.bankId) state.banks[b.bankId].balance = Math.max(0, state.banks[b.bankId].balance + (b.isDone ? -b.amount : b.amount));
+      saveState();
+    };
+    window.openBillModal = (id) => {
+      const b = id ? state.bills.find(x => x.id === id) : null;
+      modalBillRecurring = b ? b.recurringMonthly : true;
+      openModal(b ? 'Edit Bill Reminder' : 'Add Bill / Payment Due', 'Track WiFi, mobile recharge, insurance, or subscriptions', `
+        <form onsubmit="saveBillModal(event, '${id || ''}')" class="space-y-4">
+          <input id="mBName" value="${b ? esc(b.name) : ''}" placeholder="Bill Name (e.g. WiFi, Recharge)" required class="w-full h-11 px-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm dark:text-white" />
+          <div class="grid grid-cols-2 gap-3"><input id="mBAmt" type="number" min="1" value="${b ? b.amount : ''}" placeholder="Amount ₹" required class="h-11 px-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm tabular-nums dark:text-white" /><input id="mBDate" type="date" value="${b ? b.dueDate : (calSelected || todayIso())}" required class="h-11 px-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm dark:text-white" /></div>
+          <select id="mBBank" class="w-full h-11 px-3.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-sm dark:text-white"><option value="icici" ${b && b.bankId === 'icici' ? 'selected' : ''}>Deduct from ICICI Bank</option><option value="hdfc" ${b && b.bankId === 'hdfc' ? 'selected' : ''}>Deduct from HDFC Bank</option><option value="" ${b && !b.bankId ? 'selected' : ''}>Track reminder only</option></select>
+          <label class="flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 text-sm cursor-pointer"><span>Recurring Monthly Bill</span><input id="mBRec" type="checkbox" ${modalBillRecurring ? 'checked' : ''} /></label>
+          <div class="flex gap-3">${b ? '<button type="button" onclick="deleteBillModal(\'' + b.id + '\')" class="h-11 px-4 rounded-xl border border-rose-500/30 text-sm text-rose-500">Delete</button>' : ''}<button type="button" onclick="closeModal()" class="flex-1 h-11 rounded-xl border border-slate-200 dark:border-white/15 text-sm">Cancel</button><button type="submit" class="flex-1 h-11 rounded-xl bg-sky-400 text-slate-950 text-sm font-semibold">Save</button></div>
+        </form>
+      `);
+    };
+    window.saveBillModal = (e, id) => {
+      e.preventDefault();
+      const data = { id: id || uid('bill'), name: mBName.value.trim(), amount: Math.max(1, Number(mBAmt.value) || 1), dueDate: mBDate.value || todayIso(), recurringMonthly: mBRec.checked, isDone: id ? (state.bills.find(x => x.id === id)?.isDone || false) : false, bankId: mBBank.value || undefined };
+      if (id) state.bills = state.bills.map(b => b.id === id ? data : b);
+      else state.bills.push(data);
+      closeModal(); saveState();
+    };
+    window.deleteBillModal = (id) => { state.bills = state.bills.filter(b => b.id !== id); closeModal(); saveState(); };
+
+    window.openBackupModal = () => {
+      openModal('Data Backup & Reset', 'Save your JSON data or reset to defaults', `
+        <div class="space-y-3">
+          <button type="button" onclick="downloadJson()" class="w-full h-11 rounded-xl bg-sky-400 text-slate-950 text-sm font-semibold">Download JSON Backup</button>
+          <label class="w-full h-11 rounded-xl glass-sub text-sm font-medium flex items-center justify-center cursor-pointer">Import JSON Backup<input type="file" accept="application/json" onchange="importJson(event)" class="hidden" /></label>
+          <div class="grid grid-cols-2 gap-3 pt-2">
+            <button type="button" onclick="resetToDefault()" class="h-11 rounded-xl border border-slate-200 dark:border-white/15 text-xs font-medium">Load Sample Data</button>
+            <button type="button" onclick="clearToZero()" class="h-11 rounded-xl border border-rose-500/30 text-xs font-medium text-rose-500">Start Fresh (₹0)</button>
+          </div>
+        </div>
+      `);
+    };
+    window.downloadJson = () => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' }));
+      a.download = 'wealth-manager-backup-' + todayIso() + '.json';
+      a.click();
+    };
+    window.importJson = (e) => {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = () => { try { const p = JSON.parse(String(r.result)); if (p && p.banks) { state = p; closeModal(); saveState(); } } catch {} };
+      r.readAsText(f);
+    };
+    window.resetToDefault = () => { state = JSON.parse(JSON.stringify(DEFAULT_STATE)); closeModal(); saveState(); };
+    window.clearToZero = () => {
+      state = {
+        theme: state.theme,
+        banks: {
+          icici: { id: 'icici', name: 'ICICI Bank', shortName: 'ICICI', balance: 0, categories: [{ id: 'icici_cat_monthly', name: 'Monthly Expenses', allocated: 0, spent: 0, kind: 'expense' }, { id: 'icici_cat_savings', name: 'Savings', allocated: 0, spent: 0, kind: 'savings' }] },
+          hdfc: { id: 'hdfc', name: 'HDFC Bank', shortName: 'HDFC', balance: 0, categories: [{ id: 'hdfc_cat_monthly', name: 'Monthly Expenses', allocated: 0, spent: 0, kind: 'expense' }, { id: 'hdfc_cat_savings', name: 'Savings', allocated: 0, spent: 0, kind: 'savings' }] }
+        },
+        investments: { mt5: 0, fd: 0, pf: 0 },
+        expectedExpenses: [], creditCardExpenses: [], goals: [], expenseEntries: [], bills: []
+      };
+      closeModal(); saveState();
+    };
+
+    applyTheme();
+    render();
+  </script>
+</body>
+</html>
